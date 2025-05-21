@@ -1,75 +1,69 @@
 import numpy as np
 import cv2
 from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing.image import load_img, img_to_array
+# from tensorflow.keras.preprocessing.image import load_img, img_to_array
 import tensorflow as tf
-import sys
-from model import Tiny_model, F1Score
+from model import Tiny_model
+import os
 
 # Load custom metric nếu có dùng khi save model
 # from tensorflow_addons.metrics import F1Score
 
 
-def test():
-    IMAGE_PATH = "1.jpeg"
-    OUTPUT_PATH = 'output.jpg'
-    INPUT_SHAPE = (96, 96)
-    GRID_SIZE = 3
-    MODEL_PATH = "best.h5"
-    THRESHOLD = 0.5
+MODEL_PATH = "tinymodel.h5"
+IMAGE_DIR = "dataset/test/images"  
+OUTPUT_DIR = "output"  
+IMG_SIZE = 96
+MAX_OBJECTS = 12
 
-    model = load_model(MODEL_PATH, custom_objects={
-        'F1Score': F1Score,
-    })
+def load_image(path, size=IMG_SIZE):
+    img = cv2.imread(path)
+    if img is None:
+        raise ValueError(f"Không load được ảnh: {path}")
+    img_resized = cv2.resize(img, (size, size))
+    img_norm = img_resized.astype(np.float32) / 255.0
+    return img, img_norm  # trả cả ảnh gốc và ảnh chuẩn hóa
 
-    # Load ảnh và tiền xử lý
-    img = load_img(IMAGE_PATH, target_size=INPUT_SHAPE)
-    img_array = img_to_array(img) / 255.0  # Chuẩn hóa về [0,1]
-    img_array = np.expand_dims(img_array, axis=0)  # thêm batch dimension
+# ----------- Vẽ polygon ----------
+def draw_polygons(img, coords_list, color=(0, 255, 0)):
+    h, w = img.shape[:2]
+    for coords in coords_list:
+        pts = np.array([
+            [int(coords[0] * w), int(coords[1] * h)],
+            [int(coords[2] * w), int(coords[3] * h)],
+            [int(coords[4] * w), int(coords[5] * h)],
+            [int(coords[6] * w), int(coords[7] * h)]
+        ], dtype=np.int32).reshape((-1, 1, 2))
+        cv2.polylines(img, [pts], isClosed=True, color=color, thickness=2)
 
-    # Dự đoán
-    pred = model.predict(img_array)[0]  # Lấy kết quả batch đầu tiên
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    # Xử lý output
-    pred_binary = (pred > 0.5).astype(int)
-    num_boxes = np.sum(pred_binary)
+model = load_model(MODEL_PATH)
 
-    # In kết quả
-    print(f'Dự đoán có {num_boxes} thùng hàng trong ảnh.')
-    print(f'Chi tiết từng ô (grid {GRID_SIZE}x{GRID_SIZE}):')
-    print(pred_binary.reshape((GRID_SIZE, GRID_SIZE)))
+for img_name in os.listdir(IMAGE_DIR):
+    if not img_name.lower().endswith(('.jpg', '.png')):
+        continue
 
-    # Vẽ ảnh
-    original_img = cv2.imread(IMAGE_PATH)
-    original_img = cv2.resize(original_img, INPUT_SHAPE)
+    img_path = os.path.join(IMAGE_DIR, img_name)
+    try:
+        img_original, img_input = load_image(img_path)
+    except Exception as e:
+        print(f"Bỏ qua ảnh lỗi: {img_path}")
+        continue
+    
+    img_input = np.expand_dims(img_input, axis=0)
+    pred = model.predict(img_input)[0]  
+    polygons = pred.reshape(MAX_OBJECTS, 8)
 
-    h, w = INPUT_SHAPE
-    cell_w, cell_h = w // GRID_SIZE, h // GRID_SIZE
-
-    # Vẽ lưới
-    for i in range(1, GRID_SIZE):
-        # kẻ đường ngang
-        cv2.line(original_img, (0, i * cell_h), (w, i * cell_h), (200, 200, 200), 1)
-        # kẻ đường dọc
-        cv2.line(original_img, (i * cell_w, 0), (i * cell_w, h), (200, 200, 200), 1)
-
-    # Vẽ bbox đỏ vào ô có hàng
-    for idx, val in enumerate(pred_binary):
-        if val == 1:
-            row = idx // GRID_SIZE
-            col = idx % GRID_SIZE
-            x1 = col * cell_w
-            y1 = row * cell_h
-            x2 = x1 + cell_w
-            y2 = y1 + cell_h
-            cv2.rectangle(original_img, (x1, y1), (x2, y2), (0, 0, 255), 2)
-
-    # --- Lưu kết quả ---
-    cv2.imwrite(OUTPUT_PATH, original_img)
+    # print(f"Ảnh: {img_name}")
+    # for i, poly in enumerate(polygons):
+    #     print(f"  Polygon {i+1}: {np.round(poly, 4).tolist()}")
 
 
-    # model = Tiny_model()
-    # model.model.load_weights("best.h5")
+    # Vẽ lên ảnh gốc
+    draw_polygons(img_original, polygons)
 
-if __name__ == "__main__":
-    test()
+    # Lưu kết quả
+    output_path = os.path.join(OUTPUT_DIR, img_name)
+    cv2.imwrite(output_path, img_original)
+    print(f"Đã lưu kết quả: {output_path}")

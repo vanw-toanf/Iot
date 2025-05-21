@@ -1,53 +1,63 @@
 import tensorflow as tf 
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, Dense, Dropout, Flatten
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Dense, Dropout, Flatten, BatchNormalization, GlobalAveragePooling2D
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.metrics import Precision, Recall
+from tensorflow.keras.losses import MeanSquaredError
+from tensorflow.keras.metrics import MeanAbsoluteError
+# from tensorflow.keras.metrics import Precision, Recall
 
-class F1Score(tf.keras.metrics.Metric):
-    def __init__(self, name='f1_score', **kwargs):
-        super(F1Score, self).__init__(name=name, **kwargs)
-        self.precision = tf.keras.metrics.Precision()
-        self.recall = tf.keras.metrics.Recall()
+# class F1Score(tf.keras.metrics.Metric):
+#     def __init__(self, name='f1_score', **kwargs):
+#         super(F1Score, self).__init__(name=name, **kwargs)
+#         self.precision = tf.keras.metrics.Precision()
+#         self.recall = tf.keras.metrics.Recall()
 
-    def update_state(self, y_true, y_pred, sample_weight=None):
-        y_pred = tf.round(y_pred)
-        self.precision.update_state(y_true, y_pred, sample_weight)
-        self.recall.update_state(y_true, y_pred, sample_weight)
+#     def update_state(self, y_true, y_pred, sample_weight=None):
+#         y_pred = tf.round(y_pred)
+#         self.precision.update_state(y_true, y_pred, sample_weight)
+#         self.recall.update_state(y_true, y_pred, sample_weight)
 
-    def result(self):
-        p = self.precision.result()
-        r = self.recall.result()
-        return 2 * ((p * r) / (p + r + tf.keras.backend.epsilon()))
+#     def result(self):
+#         p = self.precision.result()
+#         r = self.recall.result()
+#         return 2 * ((p * r) / (p + r + tf.keras.backend.epsilon()))
 
-    def reset_states(self):
-        self.precision.reset_states()
-        self.recall.reset_states()
+#     def reset_states(self):
+#         self.precision.reset_states()
+#         self.recall.reset_states()
 
 
 class Tiny_model():
-    def __init__(self):
+    def __init__(self, max_objects=12):
+        output_dim = max_objects*8
         self.model = Sequential([
             Conv2D(8, kernel_size=(3, 3), activation='relu', input_shape=(96, 96, 3)),
+            BatchNormalization(),
             MaxPooling2D(pool_size=(2, 2)),
             Conv2D(16, kernel_size=(3, 3), activation='relu'),
+            BatchNormalization(),
             MaxPooling2D(pool_size=(2, 2)),
             Conv2D(32, kernel_size=(3, 3), activation='relu'),
+            BatchNormalization(),
             MaxPooling2D(pool_size=(2, 2)),
-            Flatten(),
+            Conv2D(64, kernel_size=(3, 3), activation='relu'),
+            BatchNormalization(),
+            MaxPooling2D(pool_size=(2, 2)),
+            # Flatten(),
+            GlobalAveragePooling2D(),
             Dense(128, activation='relu'),
-            Dense(9, activation='relu')
+            Dense(output_dim, activation='sigmoid')
         ])
 
         self.callbacks = []
 
         self.model.compile(
             optimizer='adam',
-            loss='binary_crossentropy',
-            metrics=[ Precision(), Recall(), F1Score() ]
+            loss='mse',
+            metrics=['mae']
         )
 
-    def fit(self, X_train, y_train, validation_data, callbacks, batch_size=32, epochs=100):
-        history = self.model.fit(
+    def fit(self, X_train, y_train, validation_data, callbacks=[], batch_size=32, epochs=40):
+        return self.model.fit(
             X_train, y_train,
             validation_data=validation_data,
             batch_size=batch_size,
@@ -55,7 +65,6 @@ class Tiny_model():
             verbose=1,
             callbacks=callbacks
         )
-        return history
 
     def save_model(self, path):
         self.model.save(path)

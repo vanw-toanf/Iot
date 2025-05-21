@@ -1,35 +1,34 @@
 import cv2
-import os
 import numpy as np
 
-# Đường dẫn ảnh và nhãn
-image_path = 'dataset/train/images/000004_jpg.rf.b88f487bbc8f0e0c17350ee3c04a45b5.jpg'
-label_path = 'dataset/train/labels/000004_jpg.rf.b88f487bbc8f0e0c17350ee3c04a45b5.txt'
+def draw_ground_truth_polygons(img, label_file, color=(0, 0, 255), thickness=2):
+    h, w = img.shape[:2]
 
-# Đọc ảnh
-img = cv2.imread(image_path)
-h, w = img.shape[:2]
+    with open(label_file, 'r') as f:
+        for line in f:
+            parts = list(map(float, line.strip().split()))
+            if len(parts) != 9:
+                continue  # skip nếu không đủ 8 tọa độ
 
-# Đọc file label
-with open(label_path, 'r') as f:
-    for line in f:
-        parts = list(map(float, line.strip().split()))
-        class_id = int(parts[0])
-        points = parts[1:]
+            # Bỏ class_id, lấy 8 giá trị tiếp theo
+            coords = parts[1:]  # x1 y1 x2 y2 x3 y3 x4 y4 (normalized)
+            points = np.array([
+                [int(coords[0] * w), int(coords[1] * h)],
+                [int(coords[2] * w), int(coords[3] * h)],
+                [int(coords[4] * w), int(coords[5] * h)],
+                [int(coords[6] * w), int(coords[7] * h)]
+            ], dtype=np.int32).reshape((-1, 1, 2))
 
-        # Chuyển điểm chuẩn hóa -> pixel
-        pts = []
-        for i in range(0, len(points), 2):
-            x = int(points[i] * w)
-            y = int(points[i + 1] * h)
-            pts.append((x, y))
+            cv2.polylines(img, [points], isClosed=True, color=color, thickness=thickness)
 
-        # Vẽ polygon
-        pts_np = cv2.convexHull(np.array(pts)).reshape((-1, 1, 2))
-        cv2.polylines(img, [pts_np], isClosed=True, color=(0, 255, 0), thickness=2)
-        cv2.putText(img, str(class_id), pts[0], cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,255,0), 1)
+    return img
 
-# Hiển thị ảnh
-cv2.imshow("Polygon Bounding Box", img)
+img_path = "dataset/train/images/15-04-2022__10-02-35AM_jpg.rf.201a97f02e33c31b348ea628a958db5e.jpg"
+label_path = "dataset/train/labels/15-04-2022__10-02-35AM_jpg.rf.201a97f02e33c31b348ea628a958db5e.txt"
+
+img = cv2.imread(img_path)
+img_with_labels = draw_ground_truth_polygons(img, label_path)
+
+cv2.imshow("Ground Truth", img_with_labels)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
