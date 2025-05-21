@@ -22,21 +22,57 @@ class F1Score(tf.keras.metrics.Metric):
     def reset_states(self):
         self.precision.reset_states()
         self.recall.reset_states()
-        
-Tiny_model = Sequential([
-    Conv2D( 8, kernel_size=(3, 3), activation='relu', input_shape=(96, 96, 3)),
-    MaxPooling2D(pool_size=(2, 2)),
-    Conv2D(16, kernel_size=(3, 3), activation='relu'),
-    MaxPooling2D(pool_size=(2, 2)),
-    Conv2D(32, kernel_size=(3, 3), activation='relu'),
-    MaxPooling2D(pool_size=(2, 2)),
-    Flatten(),
-    Dense(128, activation='relu'),
-    Dense(9, activation='sigmoid')
-])
 
-Tiny_model.compile(
-    optimizer='adam', 
-    loss='binary_crossentropy', 
-    metrics=[ Precision(), Recall(), F1Score() ] 
-)  
+
+class Tiny_model():
+    def __init__(self):
+        self.model = Sequential([
+            Conv2D(8, kernel_size=(3, 3), activation='relu', input_shape=(96, 96, 3)),
+            MaxPooling2D(pool_size=(2, 2)),
+            Conv2D(16, kernel_size=(3, 3), activation='relu'),
+            MaxPooling2D(pool_size=(2, 2)),
+            Conv2D(32, kernel_size=(3, 3), activation='relu'),
+            MaxPooling2D(pool_size=(2, 2)),
+            Flatten(),
+            Dense(128, activation='relu'),
+            Dense(9, activation='relu')
+        ])
+
+        self.callbacks = []
+
+        self.model.compile(
+            optimizer='adam',
+            loss='binary_crossentropy',
+            metrics=[ Precision(), Recall(), F1Score() ]
+        )
+
+    def fit(self, X_train, y_train, validation_data, callbacks, batch_size=32, epochs=100):
+        history = self.model.fit(
+            X_train, y_train,
+            validation_data=validation_data,
+            batch_size=batch_size,
+            epochs=epochs,
+            verbose=1,
+            callbacks=callbacks
+        )
+        return history
+
+    def save_model(self, path):
+        self.model.save(path)
+# Tiny_model = Sequential([
+#     Conv2D( 8, kernel_size=(3, 3), activation='relu', input_shape=(96, 96, 3)),
+#     MaxPooling2D(pool_size=(2, 2)),
+#     Conv2D(16, kernel_size=(3, 3), activation='relu'),
+#     MaxPooling2D(pool_size=(2, 2)),
+#     Conv2D(32, kernel_size=(3, 3), activation='relu'),
+#     MaxPooling2D(pool_size=(2, 2)),
+#     Flatten(),
+#     Dense(128, activation='relu'),
+#     Dense(9, activation='sigmoid')
+# ])
+#
+# Tiny_model.compile(
+#     optimizer='adam',
+#     loss='binary_crossentropy',
+#     metrics=[ Precision(), Recall(), F1Score() ]
+# )

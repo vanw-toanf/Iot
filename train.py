@@ -12,7 +12,7 @@ INPUT_SHAPE = (96, 96, 3)
 NUM_CELLS = 3
 NUM_CLASSES = 1
 BATCH_SIZE = 32
-EPOCHS = 20
+EPOCHS = 100
 
 def load_data(img_dir, label_dir, input_shape):
     X = []
@@ -54,7 +54,9 @@ print("y_train shape:", y_train.shape)
 
 checkpoint = ModelCheckpoint("best.h5", monitor="val_loss", save_best_only=True, verbose = 1)
 
-history = Tiny_model.fit(
+model = Tiny_model()
+
+history = model.fit(
     X_train, y_train,
     validation_data=(X_val, y_val),
     batch_size=BATCH_SIZE,
@@ -63,6 +65,6 @@ history = Tiny_model.fit(
 )
 
 # #Save the model
-# Tiny_model.save("model.h5")
+model.save_model("model.h5")
 
 print("Model saved as model.h5")
